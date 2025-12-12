@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EKAIA Puerto - Dashboard Operativo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .tab-active {
+            background-color: #2563eb;
+            color: white;
+        }
+        .alert-warning { background-color: #fef3c7; color: #92400e; }
+        .alert-critical { background-color: #fee2e2; color: #991b1b; }
+        .alert-urgent { background-color: #fecaca; color: #7f1d1d; }
+
+        .vehicle-truck { color: #7c3aed; font-weight: bold; }
+        .vehicle-car { color: #2563eb; }
+        .vehicle-motorcycle { color: #059669; }
+        .vehicle-unknown { color: #6b7280; }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="min-h-screen">
+        <!-- Header -->
+        <header class="bg-blue-600 text-white shadow-lg">
+            <div class="container mx-auto px-4 py-4">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h1 class="text-2xl font-bold">EKAIA Puerto</h1>
+                        <p class="text-blue-100 text-sm">Sistema de Control de Acceso Vehicular</p>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-sm text-blue-100">Última actualización</div>
+                        <div id="last-update" class="font-semibold">--:--:--</div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Navigation Tabs -->
+        <div class="bg-white shadow">
+            <div class="container mx-auto px-4">
+                <nav class="flex space-x-1">
+                    <button onclick="showTab('trafico')" id="tab-trafico" class="px-6 py-3 font-medium rounded-t-lg tab-active">
+                        📊 Tráfico
+                    </button>
+                    <button onclick="showTab('dentro')" id="tab-dentro" class="px-6 py-3 font-medium rounded-t-lg hover:bg-gray-100">
+                        🚗 Vehículos Dentro
+                    </button>
+                    <button onclick="showTab('clasificacion')" id="tab-clasificacion" class="px-6 py-3 font-medium rounded-t-lg hover:bg-gray-100">
+                        🚛 Clasificación
+                    </button>
+                    <button onclick="showTab('ilegibles')" id="tab-ilegibles" class="px-6 py-3 font-medium rounded-t-lg hover:bg-gray-100">
+                        ⚠️ Patentes Ilegibles
+                    </button>
+                    <button onclick="showTab('reportes')" id="tab-reportes" class="px-6 py-3 font-medium rounded-t-lg hover:bg-gray-100">
+                        📋 Reportes
+                    </button>
+                    <button onclick="showTab('alertas')" id="tab-alertas" class="px-6 py-3 font-medium rounded-t-lg hover:bg-gray-100">
+                        🔔 Alertas
+                    </button>
+                </nav>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="container mx-auto px-4 py-6">
+
+            <!-- TAB: Tráfico -->
+            <div id="content-trafico" class="tab-content">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <!-- KPI Cards -->
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <div class="text-gray-500 text-sm">Entradas (24h)</div>
+                        <div id="kpi-entries" class="text-3xl font-bold text-green-600">--</div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <div class="text-gray-500 text-sm">Salidas (24h)</div>
+                        <div id="kpi-exits" class="text-3xl font-bold text-red-600">--</div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <div class="text-gray-500 text-sm">Vehículos Dentro</div>
+                        <div id="kpi-inside" class="text-3xl font-bold text-blue-600">--</div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <div class="text-gray-500 text-sm">Tiempo Promedio</div>
+                        <div id="kpi-avgtime" class="text-3xl font-bold text-purple-600">--</div>
+                        <div class="text-gray-400 text-xs">minutos</div>
+                    </div>
+                </div>
+
+                <!-- Traffic Chart -->
+                <div class="bg-white rounded-lg shadow p-6 mb-6">
+                    <h2 class="text-xl font-bold mb-4">Tráfico por Hora (Últimas 24h)</h2>
+                    <canvas id="trafficChart" height="80"></canvas>
+                </div>
+
+                <!-- Peak Hours -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <h3 class="text-lg font-semibold mb-2">Hora Pico - Entradas</h3>
+                        <div id="peak-entry" class="text-2xl font-bold text-green-600">--:--</div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <h3 class="text-lg font-semibold mb-2">Hora Pico - Salidas</h3>
+                        <div id="peak-exit" class="text-2xl font-bold text-red-600">--:--</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: Vehículos Dentro -->
+            <div id="content-dentro" class="tab-content hidden">
+                <div class="bg-white rounded-lg shadow p-6 mb-4">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-bold">Vehículos Actualmente Dentro</h2>
+                        <div>
+                            <label class="text-sm text-gray-600 mr-2">Filtrar tiempo mínimo:</label>
+                            <select id="filter-hours" onchange="loadVehiclesDentro()" class="border rounded px-3 py-1">
+                                <option value="0">Todos</option>
+                                <option value="1">+1 hora</option>
+                                <option value="4">+4 horas</option>
+                                <option value="12">+12 horas</option>
+                                <option value="24">+24 horas</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Patente</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Hora Entrada</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tiempo Dentro</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Confianza</th>
+                                </tr>
+                            </thead>
+                            <tbody id="table-dentro" class="bg-white divide-y divide-gray-200">
+                                <tr><td colspan="5" class="px-6 py-4 text-center text-gray-500">Cargando...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: Clasificación -->
+            <div id="content-clasificacion" class="tab-content hidden">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <!-- Vehicle Type Distribution -->
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <h2 class="text-xl font-bold mb-4">Distribución por Tipo (24h)</h2>
+                        <canvas id="typeChart" height="250"></canvas>
+                    </div>
+
+                    <!-- Stats Table -->
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <h2 class="text-xl font-bold mb-4">Estadísticas por Tipo</h2>
+                        <table class="min-w-full">
+                            <thead>
+                                <tr class="border-b">
+                                    <th class="text-left py-2">Tipo</th>
+                                    <th class="text-right py-2">Cantidad</th>
+                                    <th class="text-right py-2">%</th>
+                                    <th class="text-right py-2">Tiempo Prom.</th>
+                                </tr>
+                            </thead>
+                            <tbody id="table-types">
+                                <tr><td colspan="4" class="text-center py-4 text-gray-500">Cargando...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <p class="text-sm text-blue-800">
+                        <strong>Nota:</strong> La clasificación de vehículos se basa en el tamaño del área detectada.
+                        Camiones tienen área mayor a 150,000 px², autos entre 50,000-150,000 px², y motocicletas menor a 50,000 px².
+                    </p>
+                </div>
+            </div>
+
+            <!-- TAB: Patentes Ilegibles -->
+            <div id="content-ilegibles" class="tab-content hidden">
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-bold">Patentes Ilegibles o Baja Confianza</h2>
+                        <div>
+                            <label class="text-sm text-gray-600 mr-2">Período:</label>
+                            <select id="filter-illegible-hours" onchange="loadPatentesIlegibles()" class="border rounded px-3 py-1">
+                                <option value="24">Últimas 24h</option>
+                                <option value="48">Últimas 48h</option>
+                                <option value="72">Últimas 72h</option>
+                                <option value="168">Última semana</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded">
+                        <p class="text-sm text-yellow-800">
+                            Este registro ayuda a identificar problemas con las cámaras, condiciones de iluminación,
+                            o patentes que requieren verificación manual.
+                        </p>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cámara</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Patente (intento)</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Confianza</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha/Hora</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Razón</th>
+                                </tr>
+                            </thead>
+                            <tbody id="table-ilegibles" class="bg-white divide-y divide-gray-200">
+                                <tr><td colspan="5" class="px-4 py-4 text-center text-gray-500">Cargando...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div id="ilegibles-total" class="mt-4 text-sm text-gray-600"></div>
+                </div>
+            </div>
+
+            <!-- TAB: Reportes -->
+            <div id="content-reportes" class="tab-content hidden">
+                <div class="bg-white rounded-lg shadow p-6 mb-6">
+                    <h2 class="text-xl font-bold mb-4">Reporte Diario Operativo</h2>
+
+                    <div class="mb-4">
+                        <label class="text-sm text-gray-600 mr-2">Fecha:</label>
+                        <input type="date" id="report-date" class="border rounded px-3 py-1" />
+                        <button onclick="loadDailyReport()" class="ml-2 bg-blue-600 text-white px-4 py-1 rounded hover:bg-blue-700">
+                            Generar Reporte
+                        </button>
+                    </div>
+
+                    <div id="daily-report-content">
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                            <div class="border rounded p-4">
+                                <div class="text-gray-500 text-sm">Entradas</div>
+                                <div id="report-entries" class="text-2xl font-bold text-green-600">--</div>
+                            </div>
+                            <div class="border rounded p-4">
+                                <div class="text-gray-500 text-sm">Salidas</div>
+                                <div id="report-exits" class="text-2xl font-bold text-red-600">--</div>
+                            </div>
+                            <div class="border rounded p-4">
+                                <div class="text-gray-500 text-sm">Camiones</div>
+                                <div id="report-trucks" class="text-2xl font-bold text-purple-600">--</div>
+                            </div>
+                            <div class="border rounded p-4">
+                                <div class="text-gray-500 text-sm">Autos</div>
+                                <div id="report-cars" class="text-2xl font-bold text-blue-600">--</div>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                            <div class="border rounded p-4">
+                                <div class="text-gray-500 text-sm">Hora Pico</div>
+                                <div id="report-peak" class="text-xl font-semibold">--</div>
+                            </div>
+                            <div class="border rounded p-4">
+                                <div class="text-gray-500 text-sm">Tiempo Promedio Estadía</div>
+                                <div id="report-avgstay" class="text-xl font-semibold">--</div>
+                            </div>
+                        </div>
+
+                        <div class="border-t pt-4">
+                            <h3 class="font-semibold mb-2">Alertas del Día</h3>
+                            <ul id="report-alerts" class="list-disc list-inside text-gray-700">
+                                <li>Sin datos</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h2 class="text-xl font-bold mb-4">Exportar Datos</h2>
+                    <p class="text-gray-600 mb-4">Exporta datos de tráfico a CSV para auditoría y análisis externo.</p>
+                    <div class="flex items-center gap-4">
+                        <div>
+                            <label class="text-sm text-gray-600 mr-2">Últimos:</label>
+                            <select id="export-days" class="border rounded px-3 py-1">
+                                <option value="1">1 día</option>
+                                <option value="7" selected>7 días</option>
+                                <option value="30">30 días</option>
+                                <option value="90">90 días</option>
+                            </select>
+                        </div>
+                        <button onclick="exportToCSV()" class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">
+                            📥 Descargar CSV
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: Alertas -->
+            <div id="content-alertas" class="tab-content hidden">
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h2 class="text-xl font-bold mb-4">Vehículos con Estadía Prolongada</h2>
+
+                    <div class="mb-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                        <div class="p-3 bg-yellow-50 border border-yellow-200 rounded">
+                            <strong>Warning:</strong> Más de 12 horas
+                        </div>
+                        <div class="p-3 bg-orange-50 border border-orange-200 rounded">
+                            <strong>Critical:</strong> Más de 24 horas
+                        </div>
+                        <div class="p-3 bg-red-50 border border-red-200 rounded">
+                            <strong>Urgent:</strong> Más de 48 horas
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Patente</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Entrada</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tiempo Dentro</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nivel</th>
+                                </tr>
+                            </thead>
+                            <tbody id="table-alertas" class="bg-white divide-y divide-gray-200">
+                                <tr><td colspan="4" class="px-6 py-4 text-center text-gray-500">Cargando...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div id="alertas-count" class="mt-4 text-sm text-gray-600"></div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // Estado global
+        let trafficChart = null;
+        let typeChart = null;
+        let refreshInterval = null;
+
+        // Inicialización
+        document.addEventListener('DOMContentLoaded', function() {
+            // Establecer fecha de hoy en el input
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('report-date').value = today;
+
+            // Cargar datos iniciales
+            loadTrafficData();
+
+            // Auto-refresh cada 30 segundos
+            refreshInterval = setInterval(() => {
+                const activeTab = document.querySelector('.tab-active').id.replace('tab-', '');
+                loadTabData(activeTab);
+            }, 30000);
+        });
+
+        // Navegación entre pestañas
+        function showTab(tabName) {
+            // Ocultar todos los contenidos
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+
+            // Quitar clase activa de todos los tabs
+            document.querySelectorAll('nav button').forEach(el => el.classList.remove('tab-active'));
+
+            // Mostrar contenido seleccionado
+            document.getElementById(`content-${tabName}`).classList.remove('hidden');
+            document.getElementById(`tab-${tabName}`).classList.add('tab-active');
+
+            // Cargar datos del tab
+            loadTabData(tabName);
+        }
+
+        function loadTabData(tabName) {
+            switch(tabName) {
+                case 'trafico':
+                    loadTrafficData();
+                    break;
+                case 'dentro':
+                    loadVehiclesDentro();
+                    break;
+                case 'clasificacion':
+                    loadVehicleTypes();
+                    break;
+                case 'ilegibles':
+                    loadPatentesIlegibles();
+                    break;
+                case 'reportes':
+                    loadDailyReport();
+                    break;
+                case 'alertas':
+                    loadAlertas();
+                    break;
+            }
+            updateLastUpdate();
+        }
+
+        function updateLastUpdate() {
+            const now = new Date();
+            document.getElementById('last-update').textContent = now.toLocaleTimeString('es-CL');
+        }
+
+        // ========================================================================
+        // TRÁFICO
+        // ========================================================================
+        async function loadTrafficData() {
+            try {
+                // Cargar stats generales
+                const statsRes = await fetch('/api/puerto/traffic/stats?hours=24');
+                const stats = await statsRes.json();
+
+                document.getElementById('kpi-entries').textContent = stats.total_entries;
+                document.getElementById('kpi-exits').textContent = stats.total_exits;
+                document.getElementById('kpi-inside').textContent = stats.vehicles_inside;
+                document.getElementById('kpi-avgtime').textContent = stats.avg_stay_minutes.toFixed(0);
+                document.getElementById('peak-entry').textContent = stats.peak_hour_entry || 'N/A';
+                document.getElementById('peak-exit').textContent = stats.peak_hour_exit || 'N/A';
+
+                // Cargar datos por hora
+                const hourlyRes = await fetch('/api/puerto/traffic/hourly?hours=24');
+                const hourly = await hourlyRes.json();
+
+                // Crear gráfica
+                const ctx = document.getElementById('trafficChart');
+                if (trafficChart) {
+                    trafficChart.destroy();
+                }
+
+                trafficChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: hourly.map(h => `${h.hour}:00`),
+                        datasets: [{
+                            label: 'Entradas',
+                            data: hourly.map(h => h.entries),
+                            borderColor: 'rgb(34, 197, 94)',
+                            backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                            tension: 0.3
+                        }, {
+                            label: 'Salidas',
+                            data: hourly.map(h => h.exits),
+                            borderColor: 'rgb(239, 68, 68)',
+                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                            tension: 0.3
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        plugins: {
+                            legend: { position: 'top' }
+                        },
+                        scales: {
+                            y: { beginAtZero: true }
+                        }
+                    }
+                });
+
+            } catch (error) {
+                console.error('Error loading traffic data:', error);
+            }
+        }
+
+        // ========================================================================
+        // VEHÍCULOS DENTRO
+        // ========================================================================
+        async function loadVehiclesDentro() {
+            try {
+                const minHours = document.getElementById('filter-hours').value;
+                const res = await fetch(`/api/puerto/vehicles/inside?min_hours=${minHours}`);
+                const vehicles = await res.json();
+
+                const tbody = document.getElementById('table-dentro');
+
+                if (vehicles.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-4 text-center text-gray-500">No hay vehículos dentro</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = vehicles.map(v => `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 font-semibold">${v.plate}</td>
+                        <td class="px-6 py-4">${new Date(v.entry_time).toLocaleString('es-CL')}</td>
+                        <td class="px-6 py-4">
+                            <span class="font-semibold">${v.hours_inside.toFixed(1)}h</span>
+                            <span class="text-gray-500 text-sm">(${v.minutes_inside} min)</span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="vehicle-${v.vehicle_type}">
+                                ${v.vehicle_type === 'truck' ? '🚛 Camión' :
+                                  v.vehicle_type === 'car' ? '🚗 Auto' :
+                                  v.vehicle_type === 'motorcycle' ? '🏍️ Moto' : '❓ Desconocido'}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="px-2 py-1 rounded text-xs ${v.entry_confidence >= 0.8 ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">
+                                ${(v.entry_confidence * 100).toFixed(0)}%
+                            </span>
+                        </td>
+                    </tr>
+                `).join('');
+
+            } catch (error) {
+                console.error('Error loading vehicles inside:', error);
+            }
+        }
+
+        // ========================================================================
+        // CLASIFICACIÓN DE VEHÍCULOS
+        // ========================================================================
+        async function loadVehicleTypes() {
+            try {
+                const res = await fetch('/api/puerto/vehicles/types?hours=24');
+                const types = await res.json();
+
+                // Tabla de estadísticas
+                const tbody = document.getElementById('table-types');
+                tbody.innerHTML = types.map(t => `
+                    <tr class="border-b">
+                        <td class="py-2 vehicle-${t.vehicle_type}">
+                            ${t.vehicle_type === 'truck' ? '🚛 Camión' :
+                              t.vehicle_type === 'car' ? '🚗 Auto' :
+                              t.vehicle_type === 'motorcycle' ? '🏍️ Moto' : '❓ Desconocido'}
+                        </td>
+                        <td class="py-2 text-right font-semibold">${t.count}</td>
+                        <td class="py-2 text-right">${t.percentage.toFixed(1)}%</td>
+                        <td class="py-2 text-right">${t.avg_stay_minutes.toFixed(0)} min</td>
+                    </tr>
+                `).join('');
+
+                // Gráfica de pie
+                const ctx = document.getElementById('typeChart');
+                if (typeChart) {
+                    typeChart.destroy();
+                }
+
+                const typeLabels = {
+                    'truck': '🚛 Camiones',
+                    'car': '🚗 Autos',
+                    'motorcycle': '🏍️ Motos',
+                    'unknown': '❓ Desconocido'
+                };
+
+                const colors = {
+                    'truck': 'rgb(124, 58, 237)',
+                    'car': 'rgb(37, 99, 235)',
+                    'motorcycle': 'rgb(5, 150, 105)',
+                    'unknown': 'rgb(107, 114, 128)'
+                };
+
+                typeChart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: types.map(t => typeLabels[t.vehicle_type] || t.vehicle_type),
+                        datasets: [{
+                            data: types.map(t => t.count),
+                            backgroundColor: types.map(t => colors[t.vehicle_type] || colors.unknown),
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        plugins: {
+                            legend: { position: 'bottom' }
+                        }
+                    }
+                });
+
+            } catch (error) {
+                console.error('Error loading vehicle types:', error);
+            }
+        }
+
+        // ========================================================================
+        // PATENTES ILEGIBLES
+        // ========================================================================
+        async function loadPatentesIlegibles() {
+            try {
+                const hours = document.getElementById('filter-illegible-hours').value;
+                const res = await fetch(`/api/puerto/plates/illegible?hours=${hours}&min_confidence=0.6`);
+                const plates = await res.json();
+
+                const tbody = document.getElementById('table-ilegibles');
+
+                if (plates.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-4 text-center text-gray-500">No hay registros</td></tr>';
+                    document.getElementById('ilegibles-total').textContent = '';
+                    return;
+                }
+
+                const reasonLabels = {
+                    'low_confidence': 'Confianza baja',
+                    'no_text': 'Sin texto detectado',
+                    'partial_read': 'Lectura parcial',
+                    'invalid_format': 'Formato inválido'
+                };
+
+                tbody.innerHTML = plates.slice(0, 100).map(p => `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-3">
+                            <span class="px-2 py-1 rounded text-xs ${p.camera === 'entrada' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                                ${p.camera}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 font-mono">${p.plate}</td>
+                        <td class="px-4 py-3">
+                            <span class="px-2 py-1 rounded text-xs ${p.confidence < 0.3 ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}">
+                                ${(p.confidence * 100).toFixed(0)}%
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 text-sm">${new Date(p.timestamp).toLocaleString('es-CL')}</td>
+                        <td class="px-4 py-3 text-sm text-gray-600">${reasonLabels[p.reason] || p.reason}</td>
+                    </tr>
+                `).join('');
+
+                document.getElementById('ilegibles-total').textContent =
+                    `Total: ${plates.length} patentes ilegibles encontradas${plates.length > 100 ? ' (mostrando primeras 100)' : ''}`;
+
+            } catch (error) {
+                console.error('Error loading illegible plates:', error);
+            }
+        }
+
+        // ========================================================================
+        // REPORTES
+        // ========================================================================
+        async function loadDailyReport() {
+            try {
+                const date = document.getElementById('report-date').value;
+                const res = await fetch(`/api/puerto/reports/daily${date ? '?date=' + date : ''}`);
+                const report = await res.json();
+
+                document.getElementById('report-entries').textContent = report.total_entries;
+                document.getElementById('report-exits').textContent = report.total_exits;
+                document.getElementById('report-trucks').textContent = report.trucks_count;
+                document.getElementById('report-cars').textContent = report.cars_count;
+                document.getElementById('report-peak').textContent = `${report.peak_hour} (${report.peak_occupancy} vehículos)`;
+                document.getElementById('report-avgstay').textContent = `${report.avg_stay_hours.toFixed(1)} horas`;
+
+                const alertsList = document.getElementById('report-alerts');
+                alertsList.innerHTML = report.alerts.map(alert => `<li>${alert}</li>`).join('');
+
+            } catch (error) {
+                console.error('Error loading daily report:', error);
+            }
+        }
+
+        async function exportToCSV() {
+            try {
+                const days = document.getElementById('export-days').value;
+                const url = `/api/puerto/reports/export/csv?days=${days}`;
+                window.open(url, '_blank');
+            } catch (error) {
+                console.error('Error exporting CSV:', error);
+                alert('Error al exportar CSV');
+            }
+        }
+
+        // ========================================================================
+        // ALERTAS
+        // ========================================================================
+        async function loadAlertas() {
+            try {
+                const res = await fetch('/api/puerto/vehicles/long-stay');
+                const alerts = await res.json();
+
+                const tbody = document.getElementById('table-alertas');
+
+                if (alerts.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" class="px-6 py-4 text-center text-green-600">✅ Sin alertas de estadía prolongada</td></tr>';
+                    document.getElementById('alertas-count').textContent = '';
+                    return;
+                }
+
+                const levelColors = {
+                    'warning': 'bg-yellow-100 text-yellow-800',
+                    'critical': 'bg-orange-100 text-orange-800',
+                    'urgent': 'bg-red-100 text-red-800'
+                };
+
+                const levelLabels = {
+                    'warning': '⚠️ Warning',
+                    'critical': '🔶 Critical',
+                    'urgent': '🚨 Urgent'
+                };
+
+                tbody.innerHTML = alerts.map(a => `
+                    <tr class="hover:bg-gray-50 alert-${a.alert_level}">
+                        <td class="px-6 py-4 font-semibold">${a.plate}</td>
+                        <td class="px-6 py-4">${new Date(a.entry_time).toLocaleString('es-CL')}</td>
+                        <td class="px-6 py-4 font-bold">${a.hours_inside.toFixed(1)} horas</td>
+                        <td class="px-6 py-4">
+                            <span class="px-3 py-1 rounded-full text-sm font-semibold ${levelColors[a.alert_level]}">
+                                ${levelLabels[a.alert_level]}
+                            </span>
+                        </td>
+                    </tr>
+                `).join('');
+
+                const urgentCount = alerts.filter(a => a.alert_level === 'urgent').length;
+                const criticalCount = alerts.filter(a => a.alert_level === 'critical').length;
+                const warningCount = alerts.filter(a => a.alert_level === 'warning').length;
+
+                document.getElementById('alertas-count').textContent =
+                    `Total: ${alerts.length} alertas (${urgentCount} urgentes, ${criticalCount} críticas, ${warningCount} warnings)`;
+
+            } catch (error) {
+                console.error('Error loading alerts:', error);
+            }
+        }
+    </script>
+</body>
+</html>

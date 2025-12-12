@@ -29,7 +29,7 @@ from app.services import (
     start_memory_manager,
     stop_memory_manager,
 )
-from app.api import streams, detection, websocket, system, analytics, billing, reports, alerts, clients
+from app.api import streams, detection, websocket, system, analytics, billing, reports, alerts, clients, puerto_operations
 
 # Logging
 logging.basicConfig(
@@ -167,6 +167,7 @@ app.include_router(billing.router)
 app.include_router(reports.router)
 app.include_router(alerts.router)
 app.include_router(clients.router)
+app.include_router(puerto_operations.router)
 
 # Static files
 try:
@@ -181,10 +182,10 @@ except Exception:
 @app.get("/", response_class=HTMLResponse)
 async def root(user = Depends(get_current_user)):
     """
-    Dashboard principal - redirige al dashboard comercial
+    Dashboard principal - Dashboard Operativo del Puerto
     """
     try:
-        with open("frontend/dashboard_comercial.html", "r") as f:
+        with open("frontend/dashboard_puerto.html", "r") as f:
             return f.read()
     except FileNotFoundError:
         # Fallback al dashboard original
@@ -202,6 +203,15 @@ async def dashboard_classic(user = Depends(get_current_user)):
             return f.read()
     except FileNotFoundError:
         return "<h1>Dashboard Clásico No Disponible</h1>"
+
+@app.get("/dashboard/comercial", response_class=HTMLResponse)
+async def dashboard_comercial(user = Depends(get_current_user)):
+    """Dashboard comercial (facturación, reportes, CRM)"""
+    try:
+        with open("frontend/dashboard_comercial.html", "r") as f:
+            return f.read()
+    except FileNotFoundError:
+        return "<h1>Dashboard Comercial No Disponible</h1>"
 
 
 # -------------------------------------------------------
