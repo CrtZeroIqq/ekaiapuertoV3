@@ -1,0 +1,34 @@
+# EKAIA Puerto - Production Requirements
+# Python 3.11+
+
+# Core Framework
+fastapi==0.109.2
+uvicorn[standard]==0.27.1
+python-multipart==0.0.9
+websockets==12.0
+
+# ML/CV Stack - CUDA 12.4+ compatible
+torch>=2.2.0
+torchvision>=0.17.0
+ultralytics==8.1.18
+opencv-python-headless==4.9.0.80
+numpy==1.26.4
+
+# OCR - PaddleOCR (mejor rendimiento tiempo real)
+paddlepaddle-gpu==2.6.0
+paddleocr==2.7.3
+Pillow==10.2.0
+
+# Database
+sqlalchemy==2.0.27
+pymysql==1.1.0
+aiomysql==0.2.0
+alembic==1.13.1
+
+# Utilities
+python-dotenv==1.0.1
+pydantic==2.6.1
+pydantic-settings==2.1.0
+
+# Monitoring
+prometheus-client==0.19.0

@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  # Cloudflare Tunnel (opcional)
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: ekaia_tunnel
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CF_TUNNEL_TOKEN}
+    networks:
+      - ekaia_network
+    restart: unless-stopped
+
+networks:
+  ekaia_network:
+    driver: bridge
