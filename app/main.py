@@ -29,7 +29,7 @@ from app.services import (
     start_memory_manager,
     stop_memory_manager,
 )
-from app.api import streams, detection, websocket, system, analytics
+from app.api import streams, detection, websocket, system, analytics, billing, reports, alerts, clients
 
 # Logging
 logging.basicConfig(
@@ -163,6 +163,10 @@ app.include_router(detection.router)
 app.include_router(websocket.router)
 app.include_router(system.router)
 app.include_router(analytics.router)
+app.include_router(billing.router)
+app.include_router(reports.router)
+app.include_router(alerts.router)
+app.include_router(clients.router)
 
 # Static files
 try:
