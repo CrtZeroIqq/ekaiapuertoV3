@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EKAIA Puerto | Business Edition</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Chart.js para gráficas -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['system-ui', 'sans-serif'],
+                        mono: ['monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        .tab-active {
+            border-bottom: 3px solid #14b8a6;
+            color: #14b8a6;
+        }
+
+        .glass {
+            background: rgba(15, 23, 42, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .animated-gradient {
+            background: linear-gradient(-45deg, #0f172a, #1e3a5f, #134e4a, #0f172a);
+            background-size: 400% 400%;
+            animation: gradient 15s ease infinite;
+        }
+
+        @keyframes gradient {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+    </style>
+</head>
+<body class="animated-gradient min-h-screen text-white">
+
+    <!-- Header -->
+    <header class="glass sticky top-0 z-50 border-b border-white/10">
+        <div class="max-w-7xl mx-auto px-6 py-4">
+            <div class="flex items-center justify-between">
+                <!-- Logo -->
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-teal-400 to-cyan-500 flex items-center justify-center shadow-lg">
+                        <i data-lucide="ship" class="w-7 h-7 text-white"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-2xl font-bold">
+                            <span class="bg-gradient-to-r from-teal-400 to-cyan-400 bg-clip-text text-transparent">EKAIA</span>
+                            <span class="text-white/90">Puerto</span>
+                        </h1>
+                        <p class="text-sm text-white/50">Business Edition</p>
+                    </div>
+                </div>
+
+                <!-- User info -->
+                <div class="flex items-center gap-4">
+                    <div class="text-right">
+                        <div class="text-sm font-medium" id="current-time">--:--:--</div>
+                        <div class="text-xs text-white/50" id="current-date">-- de -- de ----</div>
+                    </div>
+                    <button id="logoutBtn" class="px-4 py-2 bg-red-500 hover:bg-red-600 rounded-lg transition">
+                        Salir
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <nav class="glass border-b border-white/10 sticky top-[72px] z-40">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="flex gap-1 overflow-x-auto">
+                <button onclick="showTab('dashboard')" id="tab-dashboard" class="tab-btn tab-active px-6 py-4 text-sm font-medium transition whitespace-nowrap flex items-center gap-2">
+                    <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+                    Dashboard
+                </button>
+                <button onclick="showTab('facturacion')" id="tab-facturacion" class="tab-btn px-6 py-4 text-sm font-medium text-white/50 hover:text-white transition whitespace-nowrap flex items-center gap-2">
+                    <i data-lucide="dollar-sign" class="w-4 h-4"></i>
+                    Facturación
+                </button>
+                <button onclick="showTab('reportes')" id="tab-reportes" class="tab-btn px-6 py-4 text-sm font-medium text-white/50 hover:text-white transition whitespace-nowrap flex items-center gap-2">
+                    <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+                    Reportes
+                </button>
+                <button onclick="showTab('alertas')" id="tab-alertas" class="tab-btn px-6 py-4 text-sm font-medium text-white/50 hover:text-white transition whitespace-nowrap flex items-center gap-2">
+                    <i data-lucide="bell" class="w-4 h-4"></i>
+                    Alertas
+                    <span id="alert-count" class="hidden px-2 py-0.5 bg-red-500 text-white text-xs rounded-full">0</span>
+                </button>
+                <button onclick="showTab('clientes')" id="tab-clientes" class="tab-btn px-6 py-4 text-sm font-medium text-white/50 hover:text-white transition whitespace-nowrap flex items-center gap-2">
+                    <i data-lucide="users" class="w-4 h-4"></i>
+                    Clientes
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-6 py-8">
+
+        <!-- TAB: Dashboard -->
+        <div id="content-dashboard" class="tab-content">
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
+                <!-- KPI Cards -->
+                <div class="glass rounded-xl p-6">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-white/50 text-sm">Vehículos Dentro</span>
+                        <i data-lucide="truck" class="w-5 h-5 text-teal-400"></i>
+                    </div>
+                    <div class="text-3xl font-bold" id="kpi-vehicles">--</div>
+                    <div class="text-xs text-white/40 mt-1">Ocupación: <span id="kpi-occupancy">--%</span></div>
+                </div>
+
+                <div class="glass rounded-xl p-6">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-white/50 text-sm">Entradas Hoy</span>
+                        <i data-lucide="trending-up" class="w-5 h-5 text-green-400"></i>
+                    </div>
+                    <div class="text-3xl font-bold" id="kpi-entries">--</div>
+                    <div class="text-xs text-white/40 mt-1" id="kpi-change">--</div>
+                </div>
+
+                <div class="glass rounded-xl p-6">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-white/50 text-sm">Ingresos Hoy</span>
+                        <i data-lucide="dollar-sign" class="w-5 h-5 text-yellow-400"></i>
+                    </div>
+                    <div class="text-3xl font-bold" id="kpi-revenue">--</div>
+                    <div class="text-xs text-white/40 mt-1">Estimado</div>
+                </div>
+
+                <div class="glass rounded-xl p-6">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-white/50 text-sm">Alertas Activas</span>
+                        <i data-lucide="alert-triangle" class="w-5 h-5 text-red-400"></i>
+                    </div>
+                    <div class="text-3xl font-bold" id="kpi-alerts">--</div>
+                    <div class="text-xs text-white/40 mt-1"><span id="kpi-alerts-critical">--</span> críticas</div>
+                </div>
+            </div>
+
+            <!-- Streams -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="glass rounded-xl p-4">
+                    <h3 class="text-lg font-semibold mb-4">Cámara Entrada</h3>
+                    <img src="/stream/entrada" class="w-full rounded-lg" alt="Entrada">
+                </div>
+                <div class="glass rounded-xl p-4">
+                    <h3 class="text-lg font-semibold mb-4">Cámara Salida</h3>
+                    <img src="/stream/salida" class="w-full rounded-lg" alt="Salida">
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: Facturación -->
+        <div id="content-facturacion" class="tab-content hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                <div class="glass rounded-xl p-6">
+                    <div class="text-white/50 text-sm mb-2">Ingresos del Mes</div>
+                    <div class="text-3xl font-bold" id="billing-month-total">$0</div>
+                    <div class="text-xs text-teal-400 mt-1">CLP</div>
+                </div>
+                <div class="glass rounded-xl p-6">
+                    <div class="text-white/50 text-sm mb-2">Promedio por Vehículo</div>
+                    <div class="text-3xl font-bold" id="billing-avg">$0</div>
+                    <div class="text-xs text-white/40 mt-1">Por visita</div>
+                </div>
+                <div class="glass rounded-xl p-6">
+                    <div class="text-white/50 text-sm mb-2">Facturación Pendiente</div>
+                    <div class="text-3xl font-bold" id="billing-pending">$0</div>
+                    <div class="text-xs text-yellow-400 mt-1"><span id="billing-pending-count">0</span> vehículos dentro</div>
+                </div>
+            </div>
+
+            <!-- Top Clientes por Ingresos -->
+            <div class="glass rounded-xl p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-xl font-semibold">Top Clientes por Ingresos</h3>
+                    <button onclick="exportBilling()" class="px-4 py-2 bg-teal-500 hover:bg-teal-600 rounded-lg text-sm transition">
+                        <i data-lucide="download" class="w-4 h-4 inline mr-2"></i>
+                        Exportar
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead>
+                            <tr class="text-left text-white/50 text-sm border-b border-white/10">
+                                <th class="pb-3">Patente</th>
+                                <th class="pb-3">Visitas</th>
+                                <th class="pb-3">Horas Total</th>
+                                <th class="pb-3">Ingresos</th>
+                                <th class="pb-3">Plan Recomendado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="billing-top-clients" class="text-sm">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: Reportes -->
+        <div id="content-reportes" class="tab-content hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <!-- Reporte Diario -->
+                <div class="glass rounded-xl p-6">
+                    <h3 class="text-xl font-semibold mb-4">Reporte Ejecutivo Diario</h3>
+                    <div class="space-y-4" id="report-daily">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+                <!-- Comparativas -->
+                <div class="glass rounded-xl p-6">
+                    <h3 class="text-xl font-semibold mb-4">Comparativas</h3>
+                    <canvas id="chart-traffic" class="w-full" height="200"></canvas>
+                </div>
+            </div>
+
+            <!-- Reporte Mensual -->
+            <div class="glass rounded-xl p-6">
+                <h3 class="text-xl font-semibold mb-4">Resumen Mensual</h3>
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4" id="report-monthly">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: Alertas -->
+        <div id="content-alertas" class="tab-content hidden">
+            <div class="mb-6">
+                <div class="glass rounded-xl p-4 flex items-center justify-between">
+                    <div>
+                        <h3 class="text-lg font-semibold">Alertas Activas</h3>
+                        <p class="text-sm text-white/50">Actualización en tiempo real</p>
+                    </div>
+                    <button onclick="loadAlerts()" class="px-4 py-2 bg-teal-500 hover:bg-teal-600 rounded-lg">
+                        <i data-lucide="refresh-cw" class="w-4 h-4 inline mr-2"></i>
+                        Actualizar
+                    </button>
+                </div>
+            </div>
+
+            <div id="alerts-list" class="space-y-4">
+                <!-- Populated by JS -->
+            </div>
+        </div>
+
+        <!-- TAB: Clientes -->
+        <div id="content-clientes" class="tab-content hidden">
+            <!-- Distribución de Clientes -->
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
+                <div class="glass rounded-xl p-6">
+                    <div class="text-white/50 text-sm mb-2">Clientes Corporativos</div>
+                    <div class="text-3xl font-bold text-purple-400" id="clients-corporate">0</div>
+                    <div class="text-xs text-white/40 mt-1">>20 visitas/mes</div>
+                </div>
+                <div class="glass rounded-xl p-6">
+                    <div class="text-white/50 text-sm mb-2">Clientes Premium</div>
+                    <div class="text-3xl font-bold text-blue-400" id="clients-premium">0</div>
+                    <div class="text-xs text-white/40 mt-1">11-20 visitas/mes</div>
+                </div>
+                <div class="glass rounded-xl p-6">
+                    <div class="text-white/50 text-sm mb-2">Clientes Frecuentes</div>
+                    <div class="text-3xl font-bold text-green-400" id="clients-frequent">0</div>
+                    <div class="text-xs text-white/40 mt-1">3-10 visitas/mes</div>
+                </div>
+                <div class="glass rounded-xl p-6">
+                    <div class="text-white/50 text-sm mb-2">Clientes Casuales</div>
+                    <div class="text-3xl font-bold text-gray-400" id="clients-casual">0</div>
+                    <div class="text-xs text-white/40 mt-1">1-2 visitas/mes</div>
+                </div>
+            </div>
+
+            <!-- Recomendaciones de Contratos -->
+            <div class="glass rounded-xl p-6 mb-6">
+                <h3 class="text-xl font-semibold mb-4">Oportunidades de Contratos</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead>
+                            <tr class="text-left text-white/50 text-sm border-b border-white/10">
+                                <th class="pb-3">Patente</th>
+                                <th class="pb-3">Visitas/Mes</th>
+                                <th class="pb-3">Gasto Actual</th>
+                                <th class="pb-3">Plan Recomendado</th>
+                                <th class="pb-3">Ahorro</th>
+                                <th class="pb-3">Prioridad</th>
+                            </tr>
+                        </thead>
+                        <tbody id="clients-recommendations" class="text-sm">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Programa de Lealtad -->
+            <div class="glass rounded-xl p-6">
+                <h3 class="text-xl font-semibold mb-4">Programa de Lealtad</h3>
+                <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
+                    <div class="p-4 rounded-lg bg-purple-500/20 border border-purple-500/30">
+                        <div class="text-purple-400 font-semibold mb-2">🏆 Platinum</div>
+                        <div class="text-2xl font-bold mb-1" id="loyalty-platinum">0</div>
+                        <div class="text-xs text-white/50">Top 5% • 30% descuento</div>
+                    </div>
+                    <div class="p-4 rounded-lg bg-yellow-500/20 border border-yellow-500/30">
+                        <div class="text-yellow-400 font-semibold mb-2">🥇 Gold</div>
+                        <div class="text-2xl font-bold mb-1" id="loyalty-gold">0</div>
+                        <div class="text-xs text-white/50">Top 15% • 20% descuento</div>
+                    </div>
+                    <div class="p-4 rounded-lg bg-gray-400/20 border border-gray-400/30">
+                        <div class="text-gray-400 font-semibold mb-2">🥈 Silver</div>
+                        <div class="text-2xl font-bold mb-1" id="loyalty-silver">0</div>
+                        <div class="text-xs text-white/50">Top 30% • 15% descuento</div>
+                    </div>
+                    <div class="p-4 rounded-lg bg-orange-500/20 border border-orange-500/30">
+                        <div class="text-orange-400 font-semibold mb-2">🥉 Bronze</div>
+                        <div class="text-2xl font-bold mb-1" id="loyalty-bronze">0</div>
+                        <div class="text-xs text-white/50">Top 50% • 10% descuento</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // Tab switching
+        function showTab(tabName) {
+            // Hide all content
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            // Remove active from all tabs
+            document.querySelectorAll('.tab-btn').forEach(el => {
+                el.classList.remove('tab-active');
+                el.classList.add('text-white/50');
+            });
+
+            // Show selected content
+            document.getElementById(`content-${tabName}`).classList.remove('hidden');
+            // Activate selected tab
+            const activeTab = document.getElementById(`tab-${tabName}`);
+            activeTab.classList.add('tab-active');
+            activeTab.classList.remove('text-white/50');
+
+            // Load data for tab
+            loadTabData(tabName);
+        }
+
+        // Load data based on active tab
+        function loadTabData(tabName) {
+            switch(tabName) {
+                case 'dashboard':
+                    loadDashboard();
+                    break;
+                case 'facturacion':
+                    loadBilling();
+                    break;
+                case 'reportes':
+                    loadReports();
+                    break;
+                case 'alertas':
+                    loadAlerts();
+                    break;
+                case 'clientes':
+                    loadClients();
+                    break;
+            }
+        }
+
+        // Load Dashboard KPIs
+        async function loadDashboard() {
+            try {
+                const res = await fetch('/api/reports/kpi/dashboard');
+                const data = await res.json();
+
+                document.getElementById('kpi-vehicles').textContent = data.occupancy.current;
+                document.getElementById('kpi-occupancy').textContent = data.occupancy.percentage + '%';
+                document.getElementById('kpi-entries').textContent = data.traffic_today.entries;
+                document.getElementById('kpi-change').textContent = `${data.traffic_today.vs_yesterday.change_pct >= 0 ? '+' : ''}${data.traffic_today.vs_yesterday.change_pct}% vs ayer`;
+                document.getElementById('kpi-revenue').textContent = `$${(data.revenue_today.estimated_clp / 1000000).toFixed(1)}M`;
+
+                // Load alerts
+                const alertsRes = await fetch('/api/alerts/active');
+                const alertsData = await alertsRes.json();
+                document.getElementById('kpi-alerts').textContent = alertsData.total_alerts;
+                document.getElementById('kpi-alerts-critical').textContent = alertsData.summary.critical;
+
+                if (alertsData.total_alerts > 0) {
+                    document.getElementById('alert-count').textContent = alertsData.total_alerts;
+                    document.getElementById('alert-count').classList.remove('hidden');
+                }
+            } catch (e) {
+                console.error('Error loading dashboard:', e);
+            }
+        }
+
+        // Load Billing
+        async function loadBilling() {
+            try {
+                const today = new Date().toISOString().split('T')[0];
+                const firstDay = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+
+                // Month revenue
+                const monthRes = await fetch(`/api/billing/period/revenue?start_date=${firstDay}&end_date=${today}&tariff_type=por_hora`);
+                const monthData = await monthRes.json();
+
+                document.getElementById('billing-month-total').textContent = `$${(monthData.revenue.total_clp / 1000000).toFixed(2)}M`;
+                document.getElementById('billing-avg').textContent = `$${monthData.revenue.avg_per_visit_clp.toLocaleString()}`;
+
+                // Pending
+                const pendingRes = await fetch('/api/billing/pending');
+                const pendingData = await pendingRes.json();
+
+                document.getElementById('billing-pending').textContent = `$${(pendingData.total_pending_clp / 1000000).toFixed(2)}M`;
+                document.getElementById('billing-pending-count').textContent = pendingData.total_vehicles_inside;
+
+                // Top clients
+                const topRes = await fetch('/api/billing/top-revenue?days=30&limit=10');
+                const topData = await topRes.json();
+
+                const tbody = document.getElementById('billing-top-clients');
+                tbody.innerHTML = topData.top_clients.map(client => `
+                    <tr class="border-b border-white/5 hover:bg-white/5">
+                        <td class="py-3 font-mono">${client.plate}</td>
+                        <td class="py-3">${client.visit_count}</td>
+                        <td class="py-3">${client.total_hours.toFixed(1)}h</td>
+                        <td class="py-3 text-teal-400">$${(client.total_revenue_clp / 1000).toFixed(0)}K</td>
+                        <td class="py-3"><span class="px-2 py-1 bg-purple-500/20 text-purple-400 rounded text-xs">${client.recommended_plan}</span></td>
+                    </tr>
+                `).join('');
+            } catch (e) {
+                console.error('Error loading billing:', e);
+            }
+        }
+
+        // Load Reports
+        async function loadReports() {
+            try {
+                const res = await fetch('/api/reports/executive/daily');
+                const data = await res.json();
+
+                const dailyDiv = document.getElementById('report-daily');
+                dailyDiv.innerHTML = `
+                    <div class="p-4 bg-white/5 rounded-lg">
+                        <div class="text-white/50 text-xs mb-1">Tráfico</div>
+                        <div class="text-2xl font-bold">${data.traffic.entries} entradas</div>
+                        <div class="text-sm text-white/40">${data.traffic.exits} salidas</div>
+                    </div>
+                    <div class="p-4 bg-white/5 rounded-lg">
+                        <div class="text-white/50 text-xs mb-1">Ocupación Pico</div>
+                        <div class="text-2xl font-bold">${data.occupancy.peak_today}</div>
+                        <div class="text-sm text-white/40">Actual: ${data.occupancy.current}</div>
+                    </div>
+                    <div class="p-4 bg-white/5 rounded-lg">
+                        <div class="text-white/50 text-xs mb-1">Ingresos</div>
+                        <div class="text-2xl font-bold text-teal-400">$${(data.revenue.estimated_clp / 1000000).toFixed(2)}M</div>
+                        <div class="text-sm text-white/40">Promedio: $${(data.revenue.avg_per_vehicle / 1000).toFixed(1)}K</div>
+                    </div>
+                `;
+            } catch (e) {
+                console.error('Error loading reports:', e);
+            }
+        }
+
+        // Load Alerts
+        async function loadAlerts() {
+            try {
+                const res = await fetch('/api/alerts/active');
+                const data = await res.json();
+
+                const alertsList = document.getElementById('alerts-list');
+
+                if (data.total_alerts === 0) {
+                    alertsList.innerHTML = `
+                        <div class="glass rounded-xl p-8 text-center">
+                            <i data-lucide="check-circle" class="w-12 h-12 text-green-400 mx-auto mb-4"></i>
+                            <div class="text-lg font-semibold">No hay alertas activas</div>
+                            <div class="text-sm text-white/50 mt-2">El sistema está funcionando correctamente</div>
+                        </div>
+                    `;
+                } else {
+                    alertsList.innerHTML = data.alerts.map(alert => {
+                        const colors = {
+                            critical: 'red',
+                            high: 'orange',
+                            medium: 'yellow',
+                            low: 'blue'
+                        };
+                        const color = colors[alert.priority] || 'gray';
+
+                        return `
+                            <div class="glass rounded-xl p-6 border-l-4 border-${color}-500">
+                                <div class="flex items-start justify-between mb-4">
+                                    <div>
+                                        <div class="flex items-center gap-2 mb-2">
+                                            <span class="px-2 py-1 bg-${color}-500/20 text-${color}-400 rounded text-xs font-semibold uppercase">${alert.priority}</span>
+                                            <span class="text-white/50 text-xs">${new Date(alert.timestamp).toLocaleTimeString()}</span>
+                                        </div>
+                                        <h4 class="text-lg font-semibold">${alert.title}</h4>
+                                        <p class="text-white/70 mt-1">${alert.message}</p>
+                                    </div>
+                                    <i data-lucide="alert-triangle" class="w-6 h-6 text-${color}-400"></i>
+                                </div>
+                                ${alert.actions && alert.actions.length > 0 ? `
+                                    <div class="mt-4 pt-4 border-t border-white/10">
+                                        <div class="text-sm text-white/50 mb-2">Acciones recomendadas:</div>
+                                        <ul class="space-y-1">
+                                            ${alert.actions.filter(a => a).map(action => `
+                                                <li class="text-sm text-white/70">• ${action}</li>
+                                            `).join('')}
+                                        </ul>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        `;
+                    }).join('');
+                }
+
+                lucide.createIcons();
+            } catch (e) {
+                console.error('Error loading alerts:', e);
+            }
+        }
+
+        // Load Clients
+        async function loadClients() {
+            try {
+                // Client analysis
+                const analysisRes = await fetch('/api/clients/analyze?days=30');
+                const analysisData = await analysisRes.json();
+
+                document.getElementById('clients-corporate').textContent = analysisData.distribution.corporate.count;
+                document.getElementById('clients-premium').textContent = analysisData.distribution.premium.count;
+                document.getElementById('clients-frequent').textContent = analysisData.distribution.frequent.count;
+                document.getElementById('clients-casual').textContent = analysisData.distribution.casual.count;
+
+                // Recommendations
+                const recRes = await fetch('/api/clients/recommendations?min_visits=5&days=30');
+                const recData = await recRes.json();
+
+                const tbody = document.getElementById('clients-recommendations');
+                tbody.innerHTML = recData.recommendations.slice(0, 10).map(rec => `
+                    <tr class="border-b border-white/5 hover:bg-white/5">
+                        <td class="py-3 font-mono">${rec.plate}</td>
+                        <td class="py-3">${rec.current_usage.visits}</td>
+                        <td class="py-3">$${(rec.current_usage.monthly_cost_clp / 1000).toFixed(0)}K</td>
+                        <td class="py-3">${rec.recommended_plan.name}</td>
+                        <td class="py-3 text-green-400">-$${(rec.recommended_plan.estimated_savings_clp / 1000).toFixed(0)}K (${rec.recommended_plan.savings_percentage}%)</td>
+                        <td class="py-3">
+                            <span class="px-2 py-1 ${rec.conversion_priority === 'high' ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'} rounded text-xs font-semibold uppercase">
+                                ${rec.conversion_priority}
+                            </span>
+                        </td>
+                    </tr>
+                `).join('');
+
+                // Loyalty program
+                const loyaltyRes = await fetch('/api/clients/loyalty/program');
+                const loyaltyData = await loyaltyRes.json();
+
+                document.getElementById('loyalty-platinum').textContent = loyaltyData.tiers.platinum.members;
+                document.getElementById('loyalty-gold').textContent = loyaltyData.tiers.gold.members;
+                document.getElementById('loyalty-silver').textContent = loyaltyData.tiers.silver.members;
+                document.getElementById('loyalty-bronze').textContent = loyaltyData.tiers.bronze.members;
+            } catch (e) {
+                console.error('Error loading clients:', e);
+            }
+        }
+
+        // Export billing
+        async function exportBilling() {
+            const today = new Date().toISOString().split('T')[0];
+            const firstDay = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+            window.location.href = `/api/billing/export/invoice/ALL?start_date=${firstDay}&end_date=${today}`;
+        }
+
+        // Update time
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('current-time').textContent = now.toLocaleTimeString('es-CL');
+            document.getElementById('current-date').textContent = now.toLocaleDateString('es-CL', {
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric'
+            });
+        }
+
+        // Logout
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+            localStorage.removeItem('token');
+            window.location.href = '/login';
+        });
+
+        // Initialize
+        setInterval(updateTime, 1000);
+        updateTime();
+        loadDashboard();
+
+        // Auto refresh every 30 seconds
+        setInterval(() => {
+            const activeTab = document.querySelector('.tab-active').id.replace('tab-', '');
+            loadTabData(activeTab);
+        }, 30000);
+    </script>
+</body>
+</html>

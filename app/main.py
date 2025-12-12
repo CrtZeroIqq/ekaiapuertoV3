@@ -181,14 +181,27 @@ except Exception:
 @app.get("/", response_class=HTMLResponse)
 async def root(user = Depends(get_current_user)):
     """
-    Si NO está autenticado -> get_current_user lanza 401
-    Y el handler de abajo redirige a /login automáticamente.
+    Dashboard principal - redirige al dashboard comercial
     """
+    try:
+        with open("frontend/dashboard_comercial.html", "r") as f:
+            return f.read()
+    except FileNotFoundError:
+        # Fallback al dashboard original
+        try:
+            with open("frontend/index.html", "r") as f:
+                return f.read()
+        except FileNotFoundError:
+            return "<h1>Dashboard</h1>"
+
+@app.get("/dashboard/classic", response_class=HTMLResponse)
+async def dashboard_classic(user = Depends(get_current_user)):
+    """Dashboard clásico (solo cámaras)"""
     try:
         with open("frontend/index.html", "r") as f:
             return f.read()
     except FileNotFoundError:
-        return "<h1>Dashboard</h1>"
+        return "<h1>Dashboard Clásico No Disponible</h1>"
 
 
 # -------------------------------------------------------
