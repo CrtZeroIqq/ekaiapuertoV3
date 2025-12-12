@@ -3,15 +3,14 @@ EKAIA Puerto - API de Operaciones para el Puerto
 Funcionalidades operativas útiles para la gestión diaria del puerto
 """
 from fastapi import APIRouter, Depends, Query, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, or_, desc
+from sqlalchemy import select, func, and_, desc
 from datetime import datetime, timedelta
-from typing import List, Dict, Optional, Any
+from typing import List, Optional
 from pydantic import BaseModel
 import logging
 
-from app.models.database import VehicleRecord, DetectionLog, VehicleStatus, DatabaseManager
-from app.dependencies import get_db
+from app.models.database import VehicleRecord, DetectionLog, VehicleStatus
+from app.services import get_db_session
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/puerto", tags=["puerto-operations"])
@@ -143,7 +142,7 @@ def classify_illegible_reason(confidence: float, plate: str) -> str:
 @router.get("/traffic/stats", response_model=TrafficStats)
 async def get_traffic_stats(
     hours: int = Query(default=24, ge=1, le=168, description="Horas hacia atrás"),
-    db: AsyncSession = Depends(get_db)
+    db = Depends(get_db_session)
 ):
     """
     Obtiene estadísticas de tráfico del puerto
@@ -245,7 +244,7 @@ async def get_traffic_stats(
 @router.get("/traffic/hourly", response_model=List[HourlyTraffic])
 async def get_hourly_traffic(
     hours: int = Query(default=24, ge=1, le=72),
-    db: AsyncSession = Depends(get_db)
+    db = Depends(get_db_session)
 ):
     """
     Obtiene tráfico hora por hora para gráficas
@@ -309,7 +308,7 @@ async def get_hourly_traffic(
 @router.get("/vehicles/inside", response_model=List[VehicleInside])
 async def get_vehicles_inside(
     min_hours: float = Query(default=0, ge=0, description="Filtrar por tiempo mínimo dentro (horas)"),
-    db: AsyncSession = Depends(get_db)
+    db = Depends(get_db_session)
 ):
     """
     Lista de vehículos actualmente dentro del puerto
@@ -377,7 +376,7 @@ async def get_long_stay_alerts(
     warning_hours: float = Query(default=12.0, ge=1, description="Horas para alerta warning"),
     critical_hours: float = Query(default=24.0, ge=1, description="Horas para alerta critical"),
     urgent_hours: float = Query(default=48.0, ge=1, description="Horas para alerta urgent"),
-    db: AsyncSession = Depends(get_db)
+    db = Depends(get_db_session)
 ):
     """
     Alertas de vehículos con estadía prolongada
@@ -436,7 +435,7 @@ async def get_long_stay_alerts(
 async def get_illegible_plates(
     hours: int = Query(default=24, ge=1, le=168),
     min_confidence: float = Query(default=0.6, ge=0.0, le=1.0, description="Umbral de confidence"),
-    db: AsyncSession = Depends(get_db)
+    db = Depends(get_db_session)
 ):
     """
     Registro de patentes ilegibles o con baja confianza
@@ -488,7 +487,7 @@ async def get_illegible_plates(
 @router.get("/vehicles/types", response_model=List[VehicleTypeStats])
 async def get_vehicle_type_stats(
     hours: int = Query(default=24, ge=1, le=168),
-    db: AsyncSession = Depends(get_db)
+    db = Depends(get_db_session)
 ):
     """
     Estadísticas por tipo de vehículo (camiones vs autos)
@@ -557,7 +556,7 @@ async def get_vehicle_type_stats(
 @router.get("/reports/daily", response_model=DailyReport)
 async def get_daily_operational_report(
     date: Optional[str] = Query(default=None, description="Fecha YYYY-MM-DD (default: hoy)"),
-    db: AsyncSession = Depends(get_db)
+    db = Depends(get_db_session)
 ):
     """
     Reporte operativo diario completo
@@ -693,7 +692,7 @@ async def get_daily_operational_report(
 @router.get("/reports/export/csv")
 async def export_traffic_csv(
     days: int = Query(default=7, ge=1, le=90),
-    db: AsyncSession = Depends(get_db)
+    db = Depends(get_db_session)
 ):
     """
     Exporta datos de tráfico a CSV para auditoría
