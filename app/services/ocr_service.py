@@ -105,6 +105,92 @@ class LicensePlateOCR:
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
         return cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel)
 
+    def _preprocess_bilateral_clahe(self, image: np.ndarray) -> np.ndarray:
+        """Bilateral filter + CLAHE para preservar bordes y mejorar contraste"""
+        # Filtro bilateral para suavizar manteniendo bordes
+        bilateral = cv2.bilateralFilter(image, 9, 75, 75)
+
+        # CLAHE en canal L de LAB
+        lab = cv2.cvtColor(bilateral, cv2.COLOR_BGR2LAB)
+        l, a, b = cv2.split(lab)
+        clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+        l_clahe = clahe.apply(l)
+        lab_enhanced = cv2.merge([l_clahe, a, b])
+        enhanced = cv2.cvtColor(lab_enhanced, cv2.COLOR_LAB2BGR)
+
+        # Convertir a grayscale
+        return cv2.cvtColor(enhanced, cv2.COLOR_BGR2GRAY)
+
+    def _preprocess_sharpen(self, image: np.ndarray) -> np.ndarray:
+        """Sharpen para patentes borrosas"""
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+        # Kernel de sharpening
+        kernel_sharpen = np.array([[-1, -1, -1],
+                                   [-1,  9, -1],
+                                   [-1, -1, -1]])
+
+        sharpened = cv2.filter2D(gray, -1, kernel_sharpen)
+        return sharpened
+
+    def _preprocess_adaptive_multi(self, image: np.ndarray) -> np.ndarray:
+        """Threshold adaptativo con block size óptimo para patentes"""
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+        # Probar con block size más pequeño (mejor para texto pequeño)
+        adaptive = cv2.adaptiveThreshold(
+            gray, 255,
+            cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+            cv2.THRESH_BINARY,
+            11,  # Block size reducido
+            2
+        )
+
+        return adaptive
+
+    def _preprocess_denoise(self, image: np.ndarray) -> np.ndarray:
+        """Denoise + threshold para imágenes con ruido"""
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+        # Non-local means denoising
+        denoised = cv2.fastNlMeansDenoising(gray, None, h=10, templateWindowSize=7, searchWindowSize=21)
+
+        # Threshold Otsu después del denoise
+        _, binary = cv2.threshold(denoised, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+        return binary
+
+    def _preprocess_tophat(self, image: np.ndarray) -> np.ndarray:
+        """Top-hat morphology para resaltar texto en fondo oscuro"""
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+        # Morphological top-hat
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (17, 3))
+        tophat = cv2.morphologyEx(gray, cv2.MORPH_TOPHAT, kernel)
+
+        # Threshold
+        _, binary = cv2.threshold(tophat, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+        return binary
+
+    def _preprocess_edge_enhanced(self, image: np.ndarray) -> np.ndarray:
+        """Realce de bordes para patentes con bajo contraste"""
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+        # Ecualización de histograma
+        equalized = cv2.equalizeHist(gray)
+
+        # Realce de bordes usando Sobel
+        sobelx = cv2.Sobel(equalized, cv2.CV_64F, 1, 0, ksize=3)
+        sobely = cv2.Sobel(equalized, cv2.CV_64F, 0, 1, ksize=3)
+        sobel = np.sqrt(sobelx**2 + sobely**2)
+        sobel = np.uint8(sobel / sobel.max() * 255)
+
+        # Combinar con imagen original
+        combined = cv2.addWeighted(equalized, 0.7, sobel, 0.3, 0)
+
+        return combined
+
     def _resize(self, image: np.ndarray, target_height: int = 80) -> np.ndarray:
         h, w = image.shape[:2]
         if h < 30:
@@ -190,12 +276,23 @@ class LicensePlateOCR:
             return None, 0.0
 
         strategies = [
+            # Estrategias básicas (rápidas)
             ("original", self._preprocess_original),
             ("grayscale", self._preprocess_grayscale),
-            ("threshold", self._preprocess_threshold),
             ("otsu", self._preprocess_otsu),
+
+            # Estrategias avanzadas (mejores para casos difíciles)
+            ("bilateral_clahe", self._preprocess_bilateral_clahe),
+            ("sharpen", self._preprocess_sharpen),
+            ("adaptive_multi", self._preprocess_adaptive_multi),
+
+            # Estrategias adicionales
+            ("threshold", self._preprocess_threshold),
             ("invert", self._preprocess_invert),
             ("morph", self._preprocess_morph),
+            ("denoise", self._preprocess_denoise),
+            ("tophat", self._preprocess_tophat),
+            ("edge_enhanced", self._preprocess_edge_enhanced),
         ]
 
         candidates = []

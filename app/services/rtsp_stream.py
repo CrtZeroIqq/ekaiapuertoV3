@@ -284,12 +284,37 @@ class RTSPStream:
         
         return overlay_frame
 
-    def generate_jpeg_stream(self, quality: int = 80, with_overlay: bool = True) -> Generator[bytes, None, None]:
+    def generate_jpeg_stream(
+        self,
+        quality: int = 80,
+        with_overlay: bool = True,
+        scale: float = 1.0,
+        max_fps: Optional[int] = None
+    ) -> Generator[bytes, None, None]:
         """
-        Generate MJPEG stream for HTTP streaming
+        Generate MJPEG stream for HTTP streaming with adaptive compression
+
+        Args:
+            quality: JPEG quality 10-100 (default 80)
+            with_overlay: Draw detections and tripwire (default True)
+            scale: Resolution scale factor 0.25-1.0 (default 1.0)
+            max_fps: Maximum FPS limit for bandwidth control (default None = unlimited)
+
         Yields JPEG frames with optional detection overlay
         """
+        import time
+        last_frame_time = 0
+        frame_interval = 1.0 / max_fps if max_fps else 0
+
         while self.is_running:
+            # FPS limiting
+            if max_fps:
+                current_time = time.time()
+                time_since_last = current_time - last_frame_time
+                if time_since_last < frame_interval:
+                    time.sleep(frame_interval - time_since_last)
+                last_frame_time = time.time()
+
             frame = self.read(timeout=1.0)
 
             if frame is None:
@@ -303,6 +328,12 @@ class RTSPStream:
             elif with_overlay:
                 # Draw detections and tripwire
                 frame = self._draw_overlay(frame)
+
+            # Apply scaling if needed
+            if scale != 1.0 and 0.25 <= scale <= 1.0:
+                h, w = frame.shape[:2]
+                new_w, new_h = int(w * scale), int(h * scale)
+                frame = cv2.resize(frame, (new_w, new_h), interpolation=cv2.INTER_AREA)
 
             # Encode as JPEG
             _, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, quality])

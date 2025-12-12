@@ -22,8 +22,14 @@ torch.load = lambda *args, **kwargs: _original_load(*args, **{**kwargs, 'weights
 
 from app.config import get_settings
 from app.models import DatabaseManager
-from app.services import get_stream_manager, get_detector, get_ocr_service
-from app.api import streams, detection, websocket
+from app.services import (
+    get_stream_manager,
+    get_detector,
+    get_ocr_service,
+    start_memory_manager,
+    stop_memory_manager,
+)
+from app.api import streams, detection, websocket, system, analytics
 
 # Logging
 logging.basicConfig(
@@ -94,6 +100,13 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.error(f"❌ Detection loop failed: {e}")
 
+    # Memory manager
+    try:
+        start_memory_manager()
+        logger.info("✅ Memory manager started (5min interval)")
+    except Exception as e:
+        logger.error(f"❌ Memory manager failed: {e}")
+
     logger.info("🎯 EKAIA Puerto ready!")
 
     yield
@@ -103,6 +116,11 @@ async def lifespan(app: FastAPI):
     try:
         from app.api.detection import stop_detection_loop
         stop_detection_loop()
+    except:
+        pass
+    try:
+        await stop_memory_manager()
+        logger.info("✅ Memory manager stopped")
     except:
         pass
     stream_manager.stop_all()
@@ -143,6 +161,8 @@ app.add_middleware(
 app.include_router(streams.router)
 app.include_router(detection.router)
 app.include_router(websocket.router)
+app.include_router(system.router)
+app.include_router(analytics.router)
 
 # Static files
 try:

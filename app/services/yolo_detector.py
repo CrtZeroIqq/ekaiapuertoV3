@@ -86,23 +86,103 @@ class YOLODetector:
         return enhanced
 
     def _reduce_glare(self, frame: np.ndarray) -> np.ndarray:
-        """Reduce headlight glare for night detection"""
-        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+        """Advanced glare reduction with adaptive processing"""
+        # 1. Filtro bilateral para preservar bordes mientras suaviza
+        bilateral = cv2.bilateralFilter(frame, 9, 75, 75)
+
+        # 2. Convertir a HSV para procesamiento de brillo
+        hsv = cv2.cvtColor(bilateral, cv2.COLOR_BGR2HSV)
         h, s, v = cv2.split(hsv)
-        
-        # Find overexposed areas
-        _, bright_mask = cv2.threshold(v, 250, 255, cv2.THRESH_BINARY)
-        
-        # Expand mask to cover glare halo
-        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (15, 15))
-        bright_mask = cv2.dilate(bright_mask, kernel, iterations=2)
-        
-        # Reduce brightness in glare areas
-        v_reduced = v.copy()
-        v_reduced[bright_mask > 0] = np.clip(v[bright_mask > 0] * 0.5, 0, 255).astype(np.uint8)
-        
-        hsv_fixed = cv2.merge([h, s, v_reduced])
-        return cv2.cvtColor(hsv_fixed, cv2.COLOR_HSV2BGR)
+
+        # 3. Detección adaptativa de glare (no umbral fijo)
+        # Calcular umbral dinámico basado en percentil 95
+        threshold_value = max(np.percentile(v, 95), 220)
+        _, bright_mask = cv2.threshold(v, threshold_value, 255, cv2.THRESH_BINARY)
+
+        # 4. Detectar faros circulares específicamente
+        v_blur = cv2.GaussianBlur(v, (9, 9), 2)
+        circles = cv2.HoughCircles(
+            v_blur,
+            cv2.HOUGH_GRADIENT,
+            dp=1,
+            minDist=50,
+            param1=100,
+            param2=30,
+            minRadius=10,
+            maxRadius=80
+        )
+
+        # Añadir círculos detectados a la máscara de glare
+        if circles is not None:
+            circles = np.uint16(np.around(circles))
+            for circle in circles[0, :]:
+                center = (circle[0], circle[1])
+                radius = circle[2]
+                # Expandir radio 1.5x para cubrir halo
+                cv2.circle(bright_mask, center, int(radius * 1.5), 255, -1)
+
+        # 5. Expandir máscara para cubrir halo de glare
+        kernel_ellipse = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (21, 21))
+        bright_mask = cv2.dilate(bright_mask, kernel_ellipse, iterations=2)
+
+        # 6. Crear máscara suavizada para transición gradual
+        bright_mask_smooth = cv2.GaussianBlur(bright_mask, (25, 25), 0)
+        mask_factor = bright_mask_smooth / 255.0
+
+        # 7. Reducción adaptativa de brillo (más agresiva para zonas más brillantes)
+        v_reduced = v.copy().astype(np.float32)
+
+        # Factor de reducción adaptativo: entre 0.3 y 0.7 según intensidad
+        reduction_factor = np.where(
+            bright_mask_smooth > 0,
+            0.3 + (0.4 * (1 - mask_factor)),  # Más reducción donde hay más glare
+            1.0
+        )
+
+        v_reduced = np.clip(v_reduced * reduction_factor, 0, 255).astype(np.uint8)
+
+        # 8. Aumentar saturación en áreas afectadas para recuperar color
+        s_enhanced = s.copy().astype(np.float32)
+        s_enhanced = np.where(
+            bright_mask_smooth > 0,
+            np.clip(s_enhanced * (1.0 + mask_factor * 0.3), 0, 255),
+            s_enhanced
+        ).astype(np.uint8)
+
+        # 9. Reconstruir imagen
+        hsv_fixed = cv2.merge([h, s_enhanced, v_reduced])
+        result = cv2.cvtColor(hsv_fixed, cv2.COLOR_HSV2BGR)
+
+        # 10. Corrección gamma para mejorar contraste en zonas oscuras
+        gamma = 1.2
+        inv_gamma = 1.0 / gamma
+        table = np.array([((i / 255.0) ** inv_gamma) * 255 for i in range(256)]).astype("uint8")
+        result = cv2.LUT(result, table)
+
+        return result
+
+    def _night_enhancement(self, frame: np.ndarray) -> np.ndarray:
+        """Procesamiento específico para condiciones nocturnas"""
+        # Detección de condición nocturna
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        mean_brightness = np.mean(gray)
+
+        if mean_brightness < 80:  # Escena muy oscura
+            # 1. Equalización de histograma adaptativa en LAB
+            lab = cv2.cvtColor(frame, cv2.COLOR_BGR2LAB)
+            l, a, b = cv2.split(lab)
+
+            # CLAHE más agresivo para escenas oscuras
+            clahe = cv2.createCLAHE(clipLimit=3.5, tileGridSize=(8, 8))
+            l_enhanced = clahe.apply(l)
+
+            lab_enhanced = cv2.merge([l_enhanced, a, b])
+            enhanced = cv2.cvtColor(lab_enhanced, cv2.COLOR_LAB2BGR)
+
+            # 2. Reducir glare antes de retornar
+            return self._reduce_glare(enhanced)
+
+        return frame
 
     def _calculate_overlap_ratio(self, plate_bbox: List[float], vehicle_bbox: List[float]) -> float:
         px1, py1, px2, py2 = plate_bbox
@@ -196,22 +276,21 @@ class YOLODetector:
         return detections
 
     def detect(self, frame: np.ndarray, filter_plates: bool = None) -> List[Detection]:
-        """Run detection with multiple preprocessing attempts"""
+        """Run detection with multiple preprocessing attempts including night enhancement"""
         if filter_plates is None:
             filter_plates = self.plate_in_vehicle_only
 
-        # First try: preprocessed frame
+        # First try: preprocessed frame with standard CLAHE
         processed = self._preprocess_frame(frame)
         detections = self._run_inference(processed)
-        
+
         plates_found = [d for d in detections if d.class_id == 1]
-        
-        # Second try: if no plates, try with glare reduction
+
+        # Second try: if no plates, try with night enhancement (includes adaptive glare reduction)
         if len(plates_found) == 0:
-            deglared = self._reduce_glare(frame)
-            deglared_processed = self._preprocess_frame(deglared)
-            extra_detections = self._run_inference(deglared_processed)
-            
+            night_enhanced = self._night_enhancement(frame)
+            extra_detections = self._run_inference(night_enhanced)
+
             # Add new detections
             existing_bboxes = [d.bbox for d in detections]
             for det in extra_detections:
@@ -222,9 +301,29 @@ class YOLODetector:
                         break
                 if not is_duplicate:
                     detections.append(det)
-        
-        # Third try: original frame without preprocessing
+
         plates_found = [d for d in detections if d.class_id == 1]
+
+        # Third try: if still no plates, try standalone glare reduction
+        if len(plates_found) == 0:
+            deglared = self._reduce_glare(frame)
+            deglared_processed = self._preprocess_frame(deglared)
+            extra_detections = self._run_inference(deglared_processed)
+
+            # Add new detections
+            existing_bboxes = [d.bbox for d in detections]
+            for det in extra_detections:
+                is_duplicate = False
+                for existing in existing_bboxes:
+                    if self._calculate_iou(det.bbox, existing) > 0.5:
+                        is_duplicate = True
+                        break
+                if not is_duplicate:
+                    detections.append(det)
+
+        plates_found = [d for d in detections if d.class_id == 1]
+
+        # Fourth try: original frame without preprocessing (last resort)
         if len(plates_found) == 0:
             orig_detections = self._run_inference(frame)
             existing_bboxes = [d.bbox for d in detections]

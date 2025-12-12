@@ -5,6 +5,12 @@ from .rtsp_stream import RTSPStream, StreamManager, get_stream_manager
 from .detection_cooldown import SmartDetectionCooldown, get_detection_cooldown
 from .tripwire import TripwireDetector, get_tripwire_detector
 from .detection_buffer import DetectionBuffer, get_detection_buffer
+from .memory_manager import (
+    MemoryManager,
+    get_memory_manager,
+    start_memory_manager,
+    stop_memory_manager,
+)
 from app.models import DatabaseManager
 from app.config import get_settings
 
